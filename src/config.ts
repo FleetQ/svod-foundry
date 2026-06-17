@@ -47,10 +47,20 @@ export const configSchema = z.object({
     .object({
       /** 'http' = streamable HTTP (networked, the compose service model); 'stdio' = spawned subprocess. */
       transport: z.enum(['http', 'stdio']).default('http'),
-      host: z.string().default('0.0.0.0'),
+      /** Bind address. Defaults to loopback; opt into a non-loopback bind explicitly (set authTokenRef too). */
+      host: z.string().default('127.0.0.1'),
       port: z.number().int().positive().default(7519),
       /** URL path the streamable-HTTP transport is mounted at. */
       path: z.string().default('/mcp'),
+      /**
+       * Bearer token reference for the foundry's own HTTP surface. When set, every request must carry
+       * `Authorization: Bearer <token>`. Required in practice for any non-loopback bind.
+       */
+      authTokenRef: secretRefSchema.optional(),
+      /** Allowed Host headers for DNS-rebinding protection. Defaults to host:port + loopback aliases. */
+      allowedHosts: z.array(z.string()).optional(),
+      /** Allowed Origin headers (browser clients). Empty/undefined => only same-host/non-browser clients. */
+      allowedOrigins: z.array(z.string()).optional(),
     })
     .prefault({}),
 });

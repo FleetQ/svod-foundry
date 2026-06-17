@@ -20,8 +20,9 @@
   },
   "server": {
     "transport": "http",
-    "host": "0.0.0.0",
+    "host": "127.0.0.1",
     "port": 7519,
-    "path": "/mcp"
+    "path": "/mcp",
+    "authTokenRef": "env:SVOD_FOUNDRY_HTTP_TOKEN"
   }
 }

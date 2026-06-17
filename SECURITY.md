@@ -46,6 +46,11 @@ Out of scope for v1 (documented, not silently ignored — see
    `keychain:`), never inline. Svod's pre-commit secret scanning is the backstop.
 8. **Optimistic concurrency.** Writes to Svod carry `expectedRevision`; a stale write is rejected
    with a structured `conflict` and re-read/merged/retried — never blind-overwritten.
+9. **Hardened HTTP surface.** The foundry's own MCP endpoint can synthesize/run/promote tools, so it
+   defaults to a **loopback** bind, enables **DNS-rebinding protection** (`Host`/`Origin` allowlist),
+   and enforces an optional **bearer token** (`server.authTokenRef`) with a constant-time comparison.
+   A non-loopback bind without a token warns loudly at startup. Use a token for any networked
+   exposure.
 
 ## Reporting a vulnerability
 

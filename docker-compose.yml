@@ -30,9 +30,13 @@ services:
         condition: service_healthy
     ports:
       # The foundry's own MCP surface (synthesize/verify/run/promote) for calling agents.
+      # Published on host loopback only. Inside the container, set server.host to 0.0.0.0 in
+      # config.json (the published port stays loopback-only) and keep server.authTokenRef set.
       - '127.0.0.1:7519:7519'
     environment:
       SVOD_FOUNDRY_TOKEN: ${SVOD_FOUNDRY_TOKEN:-dev-write-token}
+      # Bearer token for the foundry's own HTTP surface (server.authTokenRef = env:SVOD_FOUNDRY_HTTP_TOKEN).
+      SVOD_FOUNDRY_HTTP_TOKEN: ${SVOD_FOUNDRY_HTTP_TOKEN:-dev-foundry-token}
       SVOD_FOUNDRY_CONFIG: /app/config.json
     volumes:
       # The foundry asks the HOST daemon to create ephemeral sandbox containers (ADR-0003).

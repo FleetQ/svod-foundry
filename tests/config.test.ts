@@ -12,6 +12,16 @@ describe('config schema', () => {
     expect(cfg.limits.cpus).toBe(1);
     expect(cfg.limits.pidsLimit).toBe(128);
     expect(cfg.limits.timeoutMs).toBe(30_000);
+    // Secure-by-default: the HTTP surface binds loopback, not all interfaces.
+    expect(cfg.server.transport).toBe('http');
+    expect(cfg.server.host).toBe('127.0.0.1');
+    expect(cfg.server.port).toBe(7519);
+    expect(cfg.server.path).toBe('/mcp');
+  });
+
+  it('accepts an HTTP auth token ref but rejects a literal', () => {
+    expect(parseConfig({ svod: { tokenRef: 'env:T' }, server: { authTokenRef: 'env:H' } }).server.authTokenRef).toBe('env:H');
+    expect(() => parseConfig({ svod: { tokenRef: 'env:T' }, server: { authTokenRef: 'literal' } })).toThrow();
   });
 
   it('rejects an inline (non-ref) token', () => {
