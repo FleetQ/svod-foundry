@@ -28,6 +28,9 @@ services:
     depends_on:
       svod:
         condition: service_healthy
+    ports:
+      # The foundry's own MCP surface (synthesize/verify/run/promote) for calling agents.
+      - '127.0.0.1:7519:7519'
     environment:
       SVOD_FOUNDRY_TOKEN: ${SVOD_FOUNDRY_TOKEN:-dev-write-token}
       SVOD_FOUNDRY_CONFIG: /app/config.json

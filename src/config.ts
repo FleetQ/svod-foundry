@@ -42,6 +42,17 @@ export const configSchema = z.object({
     egressProxyImage: z.string().default('nginx:1.27-alpine'),
   }).prefault({}),
   limits: limitsSchema.prefault({}),
+  /** How the foundry MCP server itself is exposed to calling agents. */
+  server: z
+    .object({
+      /** 'http' = streamable HTTP (networked, the compose service model); 'stdio' = spawned subprocess. */
+      transport: z.enum(['http', 'stdio']).default('http'),
+      host: z.string().default('0.0.0.0'),
+      port: z.number().int().positive().default(7519),
+      /** URL path the streamable-HTTP transport is mounted at. */
+      path: z.string().default('/mcp'),
+    })
+    .prefault({}),
 });
 
 export type Config = z.infer<typeof configSchema>;
