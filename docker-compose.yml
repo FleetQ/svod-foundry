@@ -1,0 +1,40 @@
+# Integration stack: a live Svod engine + the Svod Foundry.
+#
+# Used by `npm run test:integration` and for manual end-to-end runs. The foundry depends on
+# Svod over the network (MCP) and on the host Docker daemon (to spin sandbox containers).
+#
+# NOTE: set SVOD_ENGINE_IMAGE to a reachable svod-engine image. The engine is packaged as
+# app-images / native binaries; if you build a container image of it locally, point this at it.
+# Integration tests connect to Svod on the published port (127.0.0.1:7518) from the host.
+
+services:
+  svod:
+    image: ${SVOD_ENGINE_IMAGE:-ghcr.io/fleetq/svod-engine:latest}
+    ports:
+      - '127.0.0.1:7518:7518'
+    environment:
+      # A WRITE-role token for the foundry's identity. The token IS the identity.
+      SVOD_FOUNDRY_TOKEN: ${SVOD_FOUNDRY_TOKEN:-dev-write-token}
+    volumes:
+      - svod-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:7518/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  foundry:
+    build: .
+    depends_on:
+      svod:
+        condition: service_healthy
+    environment:
+      SVOD_FOUNDRY_TOKEN: ${SVOD_FOUNDRY_TOKEN:-dev-write-token}
+      SVOD_FOUNDRY_CONFIG: /app/config.json
+    volumes:
+      # The foundry asks the HOST daemon to create ephemeral sandbox containers (ADR-0003).
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config.json:/app/config.json:ro
+
+volumes:
+  svod-data:

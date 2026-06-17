@@ -1,0 +1,53 @@
+{
+  "name": "svod-foundry",
+  "version": "0.1.0",
+  "description": "An auditable tool foundry for AI agents — synthesize Agent Skills at runtime, run them only in a sandbox, and store them in Svod as versioned, attributable memory.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "svod-foundry": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "RUN_INTEGRATION=1 vitest run --config vitest.integration.config.ts",
+    "test:watch": "vitest",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dockerode": "^5.0.0",
+    "gray-matter": "^4.0.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/dockerode": "^4.0.1",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^10.5.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.9"
+  }
+}

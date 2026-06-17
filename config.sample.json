@@ -1,0 +1,21 @@
+{
+  "svod": {
+    "endpoint": "http://127.0.0.1:7518/mcp",
+    "tokenRef": "env:SVOD_FOUNDRY_TOKEN",
+    "tls": false
+  },
+  "docker": {
+    "socketPath": "/var/run/docker.sock",
+    "baseImages": {
+      "python": "python:3.12-slim",
+      "node": "node:22-slim"
+    },
+    "egressProxyImage": "nginx:1.27-alpine"
+  },
+  "limits": {
+    "memory": "256m",
+    "cpus": 1,
+    "pidsLimit": 128,
+    "timeoutMs": 30000
+  }
+}

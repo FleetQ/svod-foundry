@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Gates every change: lint, typecheck, build, and unit tests (no Docker, no network).
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+
+  # Sandbox integration: needs only the Docker daemon (present on ubuntu runners), no Svod.
+  # Runs the known-good (must pass) and known-malicious (must be contained/denied) samples.
+  sandbox-integration:
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Pull sandbox base images
+        run: |
+          docker pull python:3.12-slim
+          docker pull node:22-slim
+      - name: Sandbox integration tests
+        run: RUN_INTEGRATION=1 npx vitest run --config vitest.integration.config.ts tests/integration/sandbox.integration.test.ts
+
+  # Full Svod integration: needs a reachable svod-engine image. Enable by setting the
+  # repository variable RUN_SVOD_INTEGRATION=true and the secret/var SVOD_ENGINE_IMAGE.
+  svod-integration:
+    runs-on: ubuntu-latest
+    needs: quality
+    if: ${{ vars.RUN_SVOD_INTEGRATION == 'true' }}
+    env:
+      SVOD_ENGINE_IMAGE: ${{ vars.SVOD_ENGINE_IMAGE }}
+      SVOD_FOUNDRY_TOKEN: ${{ secrets.SVOD_FOUNDRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start Svod engine
+        run: docker compose up -d svod
+      - name: Wait for Svod health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:7518/health >/dev/null 2>&1; then echo "svod up"; exit 0; fi
+            sleep 3
+          done
+          echo "svod did not become healthy" >&2; docker compose logs svod; exit 1
+      - name: Svod integration tests
+        run: RUN_INTEGRATION=1 npx vitest run --config vitest.integration.config.ts tests/integration/svod.integration.test.ts
