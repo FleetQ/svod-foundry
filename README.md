@@ -109,7 +109,7 @@ coupled to FleetQ**; FleetQ is at most a future client behind a human approval g
 here.
 
 See [`docs/architecture.md`](docs/architecture.md) for the full design and
-[`docs/adr/`](docs/adr/) (ADR-0001 through ADR-0004) for the decision record.
+[`docs/adr/`](docs/adr/) (ADR-0001 through ADR-0005) for the decision record.
 
 ## The agent interface — 4 MCP tools
 
@@ -186,16 +186,19 @@ code outside the sandbox). An end-to-end worked example lives in [`examples/`](e
 
 ## Status
 
-**v0.1.0 — alpha, under active development.** Repo skeleton + decision record (ADR-0001 scope &
-Svod dependency, ADR-0002 stack, ADR-0003 sandbox/executor, ADR-0004 artifact format) → Svod MCP
-client wrapper (auth, `context_pack`/`write`/`read`/`promote`, optimistic concurrency) → Docker
-sandbox executor (deny-by-default egress, resource limits, identical verify/run path; contained
-against a known-malicious sample) → foundry MCP server (`synthesize`/`verify`/`run`/`promote`) →
-the foundry Skill + worked example + architecture doc.
+**v0.1.0 — alpha, feature-complete for v1.** Repo skeleton + decision record (ADR-0001 scope & Svod
+dependency, ADR-0002 stack, ADR-0003 sandbox/executor, ADR-0004 artifact format, ADR-0005 synthesis
+contract) → Svod MCP client wrapper (auth, `context_pack`/`write`/`read`/`promote`, optimistic
+concurrency) → Docker sandbox executor (deny-by-default egress, resource limits, identical verify/run
+path; contained against a known-malicious sample) → foundry MCP server (`synthesize`/`verify`/`run`/
+`promote`, streamable HTTP + stdio) → the foundry Skill + worked example (`examples/`) + architecture
+doc.
 
-Unit suite green and CI-gated on every change; integration suite runs against a live Svod engine
-and the Docker daemon via `docker compose`. See [`docs/adr/`](docs/adr/) for the decision record
-and [`CONTRIBUTING.md`](CONTRIBUTING.md) for how changes are gated.
+Full unit suite green (config, Svod client, sandbox spec, end-to-end foundry loop) and CI-gated on
+every change; the sandbox containment suite runs on Docker in CI, and the Svod/foundry integration
+suites run against a live Svod engine via `docker compose`. Each integration suite skips cleanly when
+its dependency is absent. See [`docs/adr/`](docs/adr/) for the decision record and
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for how changes are gated.
 
 This is **v1 scope: MCP-only to agents.** No App API/UI surface, no FleetQ coupling, no
 signal/webhook → synthesize wiring, no per-skill base images, no encryption at rest — see

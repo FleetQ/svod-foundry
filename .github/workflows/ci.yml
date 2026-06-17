@@ -76,5 +76,9 @@ jobs:
             sleep 3
           done
           echo "svod did not become healthy" >&2; docker compose logs svod; exit 1
-      - name: Svod integration tests
-        run: RUN_INTEGRATION=1 npx vitest run --config vitest.integration.config.ts tests/integration/svod.integration.test.ts
+      - name: Svod + foundry end-to-end integration tests
+        run: |
+          docker pull python:3.12-slim
+          RUN_INTEGRATION=1 npx vitest run --config vitest.integration.config.ts \
+            tests/integration/svod.integration.test.ts \
+            tests/integration/foundry.integration.test.ts
