@@ -92,10 +92,15 @@ export interface WriteOk {
   revision: Revision;
 }
 
-/** Params for `promote` — revision-checked move messy/ -> vault/ then status:active. */
+/**
+ * Params for `promote` — revision-checked move of a single note from messy/ to vault/.
+ * (Svod's promote is per-note: it moves `from` -> `to` and does NOT rewrite frontmatter status.)
+ */
 export interface PromoteParams {
-  /** Source path under messy/ (e.g. `messy/tools/<name>/`). */
-  path: string;
+  /** Source note path under messy/ (e.g. `messy/tools/<name>/SKILL.md`). */
+  from: string;
+  /** Destination note path under vault/ (e.g. `vault/tools/<name>/SKILL.md`). */
+  to: string;
   /** Expected current revision of the source; a mismatch is a conflict. */
   expectedRevision?: Revision;
 }

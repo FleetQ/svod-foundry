@@ -44,38 +44,42 @@ describe('SvodClient lifecycle', () => {
 });
 
 describe('recallTools', () => {
-  it('calls context_pack with enumerate:true and a type:tool filter', async () => {
-    const callTool = vi.fn(async () => textResult({ notes: [] }));
+  it('calls context_pack with enumerate:true and a top-level type:tool filter (Svod wire shape)', async () => {
+    const callTool = vi.fn(async () => textResult({ blocks: [] }));
     const { client } = makeClient(callTool);
     await client.connect();
     await client.recallTools();
 
     expect(callTool).toHaveBeenCalledWith({
       name: 'context_pack',
-      arguments: { enumerate: true, filter: { type: 'tool' } },
+      arguments: { enumerate: true, type: 'tool' },
     });
   });
 
-  it('adds a tags filter only when tags are supplied', async () => {
-    const callTool = vi.fn(async () => textResult({ notes: [] }));
+  it('passes tags under a filters object only when supplied', async () => {
+    const callTool = vi.fn(async () => textResult({ blocks: [] }));
     const { client } = makeClient(callTool);
     await client.connect();
     await client.recallTools({ tags: ['csv', 'parse'] });
 
     expect(callTool).toHaveBeenCalledWith({
       name: 'context_pack',
-      arguments: { enumerate: true, filter: { type: 'tool', tags: ['csv', 'parse'] } },
+      arguments: { enumerate: true, type: 'tool', filters: { tags: ['csv', 'parse'] } },
     });
   });
 
-  it('returns notes verbatim', async () => {
-    const notes = [
-      { path: 'vault/tools/a/SKILL.md', revision: 'r1', type: 'tool', status: 'active' },
-      { path: 'vault/tools/b/SKILL.md', revision: 'r2', type: 'tool', status: 'active' },
+  it('maps context_pack blocks to notes (commit -> revision)', async () => {
+    const blocks = [
+      { path: 'vault/tools/a/SKILL.md', heading: '', content: '...', commit: 'c1' },
+      { path: 'vault/tools/b/SKILL.md', heading: '', content: '...', commit: 'c2' },
     ];
-    const { client } = makeClient(vi.fn(async () => textResult({ notes })));
+    const { client } = makeClient(vi.fn(async () => textResult({ status: 'ok', blocks })));
     await client.connect();
-    expect(await client.recallTools()).toEqual(notes);
+    const notes = await client.recallTools();
+    expect(notes.map((n) => [n.path, n.revision])).toEqual([
+      ['vault/tools/a/SKILL.md', 'c1'],
+      ['vault/tools/b/SKILL.md', 'c2'],
+    ]);
   });
 });
 
@@ -212,22 +216,30 @@ describe('error propagation', () => {
 });
 
 describe('promote', () => {
-  it('returns the vault path + active status', async () => {
-    const { client } = makeClient(
-      vi.fn(async () => textResult({ path: 'vault/tools/x/SKILL.md', revision: 'r4', status: 'active' })),
-    );
+  it('sends from/to and defaults status to active when absent', async () => {
+    // The engine returns operation status "ok"; the wrapper reports the note lifecycle (active).
+    const callTool = vi.fn(async () => textResult({ status: 'ok', path: 'vault/tools/x/SKILL.md', revision: 'r4' }));
+    const { client } = makeClient(callTool);
     await client.connect();
-    const res = await client.promote({ path: 'messy/tools/x/SKILL.md', expectedRevision: 'r3' });
+    const res = await client.promote({
+      from: 'messy/tools/x/SKILL.md',
+      to: 'vault/tools/x/SKILL.md',
+      expectedRevision: 'r3',
+    });
     expect(res).toEqual({ path: 'vault/tools/x/SKILL.md', revision: 'r4', status: 'active' });
+    expect(callTool).toHaveBeenCalledWith({
+      name: 'promote',
+      arguments: { from: 'messy/tools/x/SKILL.md', to: 'vault/tools/x/SKILL.md', expectedRevision: 'r3' },
+    });
   });
 
-  it('throws SvodConflictError on a stale promote', async () => {
+  it('throws SvodConflictError on a stale promote (current revision field)', async () => {
     const { client } = makeClient(
-      vi.fn(async () => textResult({ conflict: { currentRevision: 'r8', currentContent: 'c' } })),
+      vi.fn(async () => textResult({ status: 'conflict', current: 'r8', currentContent: 'c' })),
     );
     await client.connect();
     await expect(
-      client.promote({ path: 'messy/tools/x/SKILL.md', expectedRevision: 'r3' }),
+      client.promote({ from: 'messy/tools/x/SKILL.md', to: 'vault/tools/x/SKILL.md', expectedRevision: 'r3' }),
     ).rejects.toBeInstanceOf(SvodConflictError);
   });
 });

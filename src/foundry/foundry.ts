@@ -28,7 +28,13 @@ import type {
   WriteParams,
 } from '../svod/index.js';
 import { synthesizeSpecSchema, type SynthesizeSpec } from './spec.js';
-import { buildSkillArtifact, parseSkillFrontmatter, runCommand, splitCommand } from './skill.js';
+import {
+  buildSkillArtifact,
+  parseSkillFrontmatter,
+  runCommand,
+  setSkillStatus,
+  splitCommand,
+} from './skill.js';
 
 /** The slice of SvodClient the foundry depends on (test seam — a fake satisfies it). */
 export interface SvodLike {
@@ -154,27 +160,52 @@ export class Foundry {
     if (!verify.pass) {
       return { promoted: false, verify };
     }
-    // Read the provisional SKILL.md for its current revision (optimistic-concurrency on the move).
-    const skill = await this.svod.read({ path: `${messyBase(name)}SKILL.md` });
-    const result = await this.svod.promote({
-      path: messyBase(name),
+    const messy = messyBase(name);
+    const vault = vaultBase(name);
+
+    // Svod's promote is a per-note move that does NOT rewrite frontmatter, so first flip the
+    // provisional SKILL.md's status -> active (optimistic write), then move both notes messy -> vault.
+    const skill = await this.svod.read({ path: `${messy}SKILL.md` });
+    const fm = parseSkillFrontmatter(skill.content);
+    const activeMarkdown = setSkillStatus(skill.content, 'active');
+    const rewritten = await this.svod.write({
+      path: `${messy}SKILL.md`,
+      content: activeMarkdown,
       expectedRevision: skill.revision,
     });
+    const movedSkill = await this.svod.promote({
+      from: `${messy}SKILL.md`,
+      to: `${vault}SKILL.md`,
+      expectedRevision: rewritten.revision,
+    });
+
+    // Move the script note too (revision-checked).
+    const script = await this.svod.read({ path: `${messy}${fm.entry}` });
+    await this.svod.promote({
+      from: `${messy}${fm.entry}`,
+      to: `${vault}${fm.entry}`,
+      expectedRevision: script.revision,
+    });
+
     return {
       promoted: true,
       verify,
-      path: result.path,
-      revision: result.revision,
-      status: result.status,
+      path: movedSkill.path,
+      revision: movedSkill.revision,
+      status: movedSkill.status,
     };
   }
 
   // --- internals ---------------------------------------------------------------------------------
 
-  /** Find an ACTIVE tool of this name in the recalled registry, if any. */
+  /**
+   * Find an ACTIVE tool of this name in the recalled registry, if any. Active tools live under
+   * vault/tools/ (promotion moves them there), so the vault path — not a frontmatter field absent
+   * from recall blocks — is the authoritative active signal.
+   */
   private async findActiveTool(name: string): Promise<SvodNote | undefined> {
     const tools = await this.svod.recallTools();
-    return tools.find((n) => nameFromPath(n.path) === name && n.status === 'active');
+    return tools.find((n) => nameFromPath(n.path) === name && n.path.startsWith('vault/tools/'));
   }
 
   /** Write a note; on an optimistic-concurrency conflict, update with the current revision. */

@@ -102,7 +102,7 @@ export class SvodClient {
 
   /** Low-level context_pack. With `enumerate:true` + a type filter it returns notes verbatim/unranked. */
   async contextPack(params: ContextPackParams = {}): Promise<ContextPackResult> {
-    const raw = await this.call('context_pack', toArgs(params));
+    const raw = await this.call('context_pack', contextPackArgs(params));
     return { notes: extractNotes(raw, 'context_pack'), raw };
   }
 
@@ -157,12 +157,14 @@ export class SvodClient {
    */
   async promote(params: PromoteParams): Promise<PromoteResult> {
     const raw = await this.call('promote', toArgs(params));
-    throwIfConflict(raw, params.path);
+    throwIfConflict(raw, params.from);
     const obj = asObject(raw, 'promote');
     return {
       path: str(obj.path, ''),
       revision: str(obj.revision, ''),
-      status: (obj.status as PromoteResult['status']) ?? 'active',
+      // A successful promote leaves the note in vault/ — its lifecycle status is `active`. (The engine's
+      // own `status` field here is the operation result ("ok"), not the note lifecycle, so don't use it.)
+      status: 'active',
     };
   }
 
@@ -262,7 +264,8 @@ function throwIfConflict(payload: unknown, path: string): void {
   const c = conflictBody(payload);
   throw new SvodConflictError({
     path,
-    currentRevision: str(c.currentRevision ?? c.revision, ''),
+    // Svod's conflict body uses `current` for the current revision + `currentContent` for the body.
+    currentRevision: str(c.currentRevision ?? c.current ?? c.revision, ''),
     currentContent: optStr(c.currentContent ?? c.content),
   });
 }
@@ -303,13 +306,38 @@ function asObject(raw: unknown, tool: string): Record<string, unknown> {
   return raw as Record<string, unknown>;
 }
 
-/** Extract a `notes` array from a recall result, tolerating `{ notes: [...] }` or a bare array. */
+/**
+ * Build context_pack arguments in the Svod wire shape. Svod takes `type`/`status` as TOP-LEVEL args
+ * (not a nested `filter`) and reads `tags` from a `filters` object. Our public ContextPackParams keeps
+ * a `filter` for ergonomics; this is the single place that maps it to the wire format.
+ */
+function contextPackArgs(p: ContextPackParams): Record<string, unknown> {
+  const args: Record<string, unknown> = {};
+  if (p.enumerate !== undefined) args.enumerate = p.enumerate;
+  if (p.query !== undefined) args.query = p.query;
+  if (p.filter?.type) args.type = p.filter.type;
+  if (p.filter?.status) args.status = p.filter.status;
+  if (p.filter?.tags && p.filter.tags.length > 0) args.filters = { tags: p.filter.tags };
+  return args;
+}
+
+/**
+ * Extract a notes array from a recall result. Svod's context_pack returns `blocks`
+ * (`{ path, heading, content, commit, ... }`); search/other callers may return `notes`/`results` or a
+ * bare array. Blocks are mapped to SvodNote (the block's `commit` is its provenance revision).
+ */
 function extractNotes(raw: unknown, tool: string): SvodNote[] {
   if (Array.isArray(raw)) return raw as SvodNote[];
   const obj = asObject(raw, tool);
+  if (Array.isArray(obj.blocks)) return (obj.blocks as Array<Record<string, unknown>>).map(blockToNote);
   if (Array.isArray(obj.notes)) return obj.notes as SvodNote[];
   if (Array.isArray(obj.results)) return obj.results as SvodNote[];
-  throw new SvodParseError(tool, 'expected a notes/results array');
+  throw new SvodParseError(tool, 'expected a blocks/notes/results array');
+}
+
+/** Map a context_pack block to a SvodNote (revision = the block's commit). */
+function blockToNote(b: Record<string, unknown>): SvodNote {
+  return { ...b, path: str(b.path, ''), revision: str(b.commit ?? b.revision, '') } as SvodNote;
 }
 
 function str(v: unknown, fallback: string): string {

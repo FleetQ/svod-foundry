@@ -41,14 +41,20 @@ class FakeSvod implements SvodLike {
     return { ok: true as const, path: params.path, revision };
   }
   async promote(params: PromoteParams) {
-    const dest = params.path.replace('messy/', 'vault/');
-    for (const [k, v] of [...this.store]) {
-      if (k.startsWith(params.path)) {
-        this.store.set(k.replace('messy/', 'vault/'), v);
-        this.store.delete(k);
-      }
+    // Svod's promote is a per-note move: from -> to, revision-checked.
+    const existing = this.store.get(params.from);
+    if (!existing) throw new Error(`promote: not found ${params.from}`);
+    if (params.expectedRevision !== undefined && params.expectedRevision !== existing.revision) {
+      throw new SvodConflictError({
+        path: params.from,
+        currentRevision: existing.revision,
+        currentContent: existing.content,
+      });
     }
-    return { path: dest, revision: this.nextRev(), status: 'active' as const };
+    this.store.delete(params.from);
+    const revision = this.nextRev();
+    this.store.set(params.to, { content: existing.content, revision });
+    return { path: params.to, revision, status: 'active' as const };
   }
 }
 
@@ -216,8 +222,12 @@ describe('promote', () => {
     expect(out.promoted).toBe(true);
     expect(out.verify.pass).toBe(true);
     expect(out.status).toBe('active');
-    expect(out.path).toBe('vault/tools/adder/');
+    expect(out.path).toBe('vault/tools/adder/SKILL.md');
+    // Both notes moved to vault; messy is empty; the promoted SKILL.md is now status: active.
     expect(svod.store.has('vault/tools/adder/SKILL.md')).toBe(true);
+    expect(svod.store.has('vault/tools/adder/tool.py')).toBe(true);
     expect(svod.store.has('messy/tools/adder/SKILL.md')).toBe(false);
+    expect(svod.store.has('messy/tools/adder/tool.py')).toBe(false);
+    expect(svod.store.get('vault/tools/adder/SKILL.md')!.content).toContain('status: active');
   });
 });

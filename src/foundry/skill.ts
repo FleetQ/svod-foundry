@@ -6,7 +6,7 @@
 
 import matter from 'gray-matter';
 
-import type { Runtime, SkillFrontmatter } from '../types.js';
+import type { Runtime, SkillFrontmatter, ToolStatus } from '../types.js';
 import { TOOL_MOUNT } from '../sandbox/spec.js';
 import { skillFrontmatterSchema, type ResolvedSpec } from './spec.js';
 
@@ -71,6 +71,13 @@ export function parseSkillFrontmatter(skillMarkdown: string): SkillFrontmatter {
     throw new Error(`invalid SKILL.md frontmatter: ${result.error.issues.map((i) => i.message).join('; ')}`);
   }
   return result.data;
+}
+
+/** Return the SKILL.md with its frontmatter `status` set to the given lifecycle value. */
+export function setSkillStatus(skillMarkdown: string, status: ToolStatus): string {
+  const parsed = matter(skillMarkdown);
+  parsed.data.status = status;
+  return matter.stringify(parsed.content, parsed.data);
 }
 
 /**

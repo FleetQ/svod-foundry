@@ -69,9 +69,11 @@ Resolves the tool from `messy/` then `vault/`. Returns `{ exitCode, stdout, stde
 
 ### promote(name)
 
-Re-run `verify`. **Only on green**, `read` the provisional `SKILL.md` for its revision and call
-Svod `promote(messy/tools/<name>/, expectedRevision)` — the revision-checked move to `vault/` with
-`status: active`. On red, return `{ promoted: false, verify }` and do nothing in Svod.
+Re-run `verify`. **Only on green**: flip the provisional `SKILL.md`'s frontmatter `status` to
+`active` (an optimistic write — Svod's `promote` is a pure per-note move and does not rewrite
+frontmatter), then `promote` both notes — `messy/tools/<name>/SKILL.md` and the script — to
+`vault/tools/<name>/`, each revision-checked. On red, return `{ promoted: false, verify }` and do
+nothing in Svod.
 
 ```
 agent ──synthesize──▶ Svod write (messy, provisional)
