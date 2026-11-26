@@ -50,6 +50,23 @@ describe('SvodClient lifecycle', () => {
     expect(fake.connect).toHaveBeenCalledTimes(2);
   });
 
+  it('two calls that hit the same 404 share one reconnect', async () => {
+    const gone = Object.assign(new Error('gone'), { code: 404 });
+    const ok = textResult({ path: 'p', content: 'c', revision: 'r1' });
+    const callTool = vi
+      .fn()
+      .mockRejectedValueOnce(gone)
+      .mockRejectedValueOnce(gone)
+      .mockResolvedValue(ok);
+    const { client, fake } = makeClient(callTool);
+    await client.connect();
+    const [a, b] = await Promise.all([client.read({ path: 'p' }), client.read({ path: 'p' })]);
+    expect(a.revision).toBe('r1');
+    expect(b.revision).toBe('r1');
+    expect(fake.close).toHaveBeenCalledOnce();
+    expect(fake.connect).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry other errors, and retries a 404 only once', async () => {
     const other = Object.assign(new Error('boom'), { code: 500 });
     const a = makeClient(vi.fn().mockRejectedValue(other));
