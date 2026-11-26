@@ -6,6 +6,12 @@ All notable changes to Svod Foundry are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- The Svod client opens a new session and retries the call once when Svod answers 404 (its session
+  was evicted after idling or the engine restarted). Before, every later call failed until the
+  foundry process was restarted.
+
 ## [0.1.0] - 2026-06-18
 
 First alpha — feature-complete for v1 (MCP-only to agents).

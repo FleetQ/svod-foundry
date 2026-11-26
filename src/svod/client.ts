@@ -195,9 +195,24 @@ export class SvodClient {
   /** Call a Svod tool and return its decoded JSON payload. Throws if not connected or tool errored. */
   private async call(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (!this.client) throw new SvodToolError(name, 'client is not connected (call connect() first)');
-    const result = await this.client.callTool({ name, arguments: args });
+    let result: CallToolResult;
+    try {
+      result = await this.client.callTool({ name, arguments: args });
+    } catch (err) {
+      // 404 = Svod no longer knows our session (idle eviction, engine restart). The request was not
+      // run, so open a new session and retry once; without this every later call failed for good.
+      if (!isSessionNotFound(err)) throw err;
+      await this.close().catch(() => {});
+      await this.connect();
+      result = await this.client!.callTool({ name, arguments: args });
+    }
     return parseToolResult(name, result);
   }
+}
+
+/** The SDK's StreamableHTTPError for HTTP 404, matched by shape so a test fake can raise it. */
+function isSessionNotFound(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 404;
 }
 
 // --- centralized result parsing (one place to adapt if Svod's schema shifts) ---------------------

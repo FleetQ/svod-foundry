@@ -35,6 +35,35 @@ describe('SvodClient lifecycle', () => {
     expect(fake.close).toHaveBeenCalledOnce();
   });
 
+  it('opens a new session and retries once when Svod answers 404 (session gone)', async () => {
+    const gone = Object.assign(new Error('Streamable HTTP error: Session not found'), { code: 404 });
+    const callTool = vi
+      .fn()
+      .mockRejectedValueOnce(gone)
+      .mockResolvedValueOnce(textResult({ path: 'p', content: 'c', revision: 'r1' }));
+    const { client, fake } = makeClient(callTool);
+    await client.connect();
+    const res = await client.read({ path: 'p' });
+    expect(res.revision).toBe('r1');
+    expect(callTool).toHaveBeenCalledTimes(2);
+    expect(fake.close).toHaveBeenCalledOnce();
+    expect(fake.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry other errors, and retries a 404 only once', async () => {
+    const other = Object.assign(new Error('boom'), { code: 500 });
+    const a = makeClient(vi.fn().mockRejectedValue(other));
+    await a.client.connect();
+    await expect(a.client.read({ path: 'p' })).rejects.toBe(other);
+    expect(a.fake.connect).toHaveBeenCalledOnce();
+
+    const gone = Object.assign(new Error('gone'), { code: 404 });
+    const b = makeClient(vi.fn().mockRejectedValue(gone));
+    await b.client.connect();
+    await expect(b.client.read({ path: 'p' })).rejects.toBe(gone);
+    expect(b.fake.connect).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects calls before connect()', async () => {
     const { client } = makeClient(vi.fn());
     await expect(client.read({ path: 'vault/tools/x/SKILL.md' })).rejects.toBeInstanceOf(
